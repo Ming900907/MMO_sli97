@@ -4,7 +4,6 @@ import { PublicKey } from "db://assets/scripts/common/secret";
 import NetworkManager from "db://assets/scripts/global/NetworkManager";
 import { RpcFunc } from "db://assets/scripts/common/enum";
 
-
 const { ccclass, property } = _decorator;
 
 const crypt = new Crypt();
@@ -64,7 +63,7 @@ export class LoginManager extends Component {
             .then((response) => response.json());
         console.log(res);
 
-       await this.connect(res.data)
+        await this.connect(res.data);
     }
 
     async connect(token: string) {

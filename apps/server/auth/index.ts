@@ -6,7 +6,13 @@ import { createHash } from "node:crypto";
 import { v4 as uuidv4 } from "uuid";
 // @ts-ignore
 import Crypt from "node-jsencrypt";
-import { PrivateKey } from "../common";
+import {
+    AuthService,
+    CheckTokenRes,
+    CheckTokenResData,
+    PrivateKey
+} from "../common";
+import * as grpc from "@grpc/grpc-js";
 
 import { createDBConnection } from "../common";
 
@@ -75,7 +81,7 @@ app.post("/login", (req, res) => {
                     const token = uuidv4();
                     cache.set(token, account);
 
-                    console.log("cache", cache)
+                    console.log("cache", cache);
                     res.json({ code: 200, data: token });
                 }
             }
@@ -85,3 +91,25 @@ app.post("/login", (req, res) => {
 app.listen(3000);
 
 console.log("auth 服务");
+
+const server = new grpc.Server();
+server.addService(AuthService, {
+    checkToken(call: any, callback: any) {
+        const token = call.request.getToken();
+        const res = new CheckTokenRes();
+        if (cache.has(token)) {
+            const data = new CheckTokenResData();
+            data.setAccount(cache.get(token));
+            res.setData(data);
+        } else {
+            res.setError("token not exist");
+        }
+
+        callback(null, res);
+    }
+});
+
+server.bindAsync("localhost:3333", grpc.ServerCredentials.createInsecure(), () => {
+    server.start();
+    console.log("RPC服务启动");
+});

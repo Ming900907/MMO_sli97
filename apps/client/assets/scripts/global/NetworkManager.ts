@@ -1,7 +1,12 @@
 import { Singleton } from "../common/base";
-import { getProtoPathByRpcFunc, RpcFunc, ProtoPathEnum, ServerPort } from "../common";
+import {
+    getProtoPathByRpcFunc,
+    RpcFunc,
+    ProtoPathEnum,
+    ServerPort
+} from "../common";
 // @ts-ignore
-import protoRoot from "../proto/index.js";
+import root from "../proto/index.js";
 
 const TIMEOUT = 5000;
 
@@ -52,10 +57,18 @@ export default class NetworkManager extends Singleton {
             this.ws.onmessage = (e) => {
                 try {
                     // TODO解析data和name
-                   const { name, data } = JSON.parse(e.data)
+                    const ta = new Uint8Array(e.data);
+                    const name = ta[ 0 ];
+                    const path = getProtoPathByRpcFunc(name, "res");
+                    const coder = root.lookup(path);
+                    const data = coder.encode(ta.slice(1));
+
                     try {
                         if (this.maps.has(name) && this.maps.get(name).length) {
-                            this.maps.get(name).forEach(({ cb, ctx }) => cb.call(ctx, data));
+                            this.maps.get(name).forEach(({
+                                                             cb,
+                                                             ctx
+                                                         }) => cb.call(ctx, data));
                         } else {
                             console.log(`no ${name} message or callback, maybe timeout`);
                         }
@@ -98,8 +111,17 @@ export default class NetworkManager extends Singleton {
 
     async send(name: RpcFunc, data: IData) {
         // TODO
-        const obj = { name, data };
-        this.ws.send(JSON.stringify(obj));
+        const path = getProtoPathByRpcFunc(name, "req");
+        const coder = root.lookup(path);
+        const ta = coder.encode(data).finish();
+        const ab = new ArrayBuffer(ta.length + 1);
+        const view = new DataView(ab);
+        let index = 0;
+        view.setUint8(index++, name);
+        for (let i = 0; i < ta.length; i++) {
+            view.setUint8(index++, ta[ i ]);
+        }
+        this.ws.send(view.buffer);
     }
 
     listen(name: RpcFunc, cb: (args: any) => void, ctx: unknown) {
